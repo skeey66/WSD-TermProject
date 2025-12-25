@@ -92,8 +92,6 @@ docker compose down
 
 ## 4) 배포 주소
 
-✅ 아래 값은 예시입니다. 제출 시 본인 배포 주소로 수정하세요.
-
 - Base URL: `http://113.198.66.68:10062`
 - Swagger URL: `http://113.198.66.68:10062/swagger-ui/index.html`
 - Health URL: `http://113.198.66.68:10062/health`
