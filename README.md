@@ -1,237 +1,277 @@
-# BlogTP (Blog API Server)
-
-Spring Boot 기반의 **블로그 API 서버**입니다.  
-JWT 인증(Access/Refresh) + Role 기반 권한(RBAC) + Flyway 마이그레이션/시드 + Redis 기반 Rate Limiting + Swagger(OpenAPI) 문서를 제공합니다.
-
----
+# WSD Term Project - BlogTP (Spring Boot)
 
 ## 1) 프로젝트 개요
 
 ### 문제 정의
-- 게시글/카테고리/댓글/좋아요/북마크를 제공하는 블로그 API를 구현하고,
-- JWT 기반 인증/인가 + 관리자 기능 + 일관된 에러 응답 + 문서/테스트(Postman)까지 포함해 **배포 가능한 형태**로 구성하는 것이 목표입니다.
+- 블로그 서비스에서 자주 필요한 기능(게시글/댓글/카테고리/좋아요/북마크/통계)과 인증(JWT)을 **REST API**로 구현하고,
+- **MySQL + Redis** 기반으로 데이터/세션(토큰) 처리를 구성한 뒤,
+- **Docker Compose로 손쉽게 실행/배포** 가능하도록 만드는 것이 목표입니다.
 
-### 주요 기능
-- **인증(Auth)**
-  - 회원가입 / 로그인 / 토큰 재발급(Refresh) / 로그아웃(Refresh 토큰 폐기)
-- **게시글(Post)**
-  - 작성/조회(단건/목록)/수정/삭제
-- **카테고리(Category)**
-  - 생성/조회/수정/삭제
-- **댓글(Comment)**
-  - 작성/목록 조회/삭제
-- **좋아요(Like)**
-  - 토글(좋아요/취소)
-- **북마크(Bookmark)**
-  - 추가/삭제/내 북마크 목록
-- **관리자(Admin)**
-  - 유저 목록 조회, 유저 Role 변경, 유저 비활성화
-- **통계(Stats, Public)**
-  - 요약/일자별 게시글 수/상위 작성자(옵션)
-- **레이트리밋**
-  - Redis 기반 요청 제한(분당 N회)
+### 주요 기능 목록
+- JWT 기반 인증/인가 (Access/Refresh)
+- 게시글 CRUD + 목록 조회(페이지네이션/정렬/검색)
+- 댓글 CRUD
+- 게시글 좋아요(Like)
+- 카테고리 관리
+- 북마크(Bookmark)
+- 통계(예: 기간별 게시글 수, 상위 작성자 등) *(Swagger/구현 범위에 따라 포함/제외 가능)*
+- Rate Limit(요청 제한) 옵션 지원
+- Actuator Health 체크 제공
 
 ---
 
 ## 2) 실행 방법
 
-## A. Docker Compose로 실행(권장)
+### 2-1. 로컬 실행 (권장: Docker Compose)
+> 로컬 PC에서 MySQL/Redis 따로 설치 안 하고도 바로 실행 가능
 
-### 준비물
-- Docker + Docker Compose Plugin
-  - 확인: `docker --version`, `docker compose version`
-
-### 실행 순서
-```bash
-# 1) 환경변수 준비
+#### 1) 환경 변수 준비
 cp .env.example .env
-
-# 2) 컨테이너 빌드 + 실행
+2) 실행
+bash
+코드 복사
 docker compose up -d --build
-
-# 3) 로그 확인
-docker compose logs -f app
-접속 확인(로컬)
+3) 정상 동작 확인
 bash
 코드 복사
-curl -i http://127.0.0.1:8080/actuator/health
+# Health
+curl -i http://localhost:8080/actuator/health
+
 # Swagger
-# http://127.0.0.1:8080/swagger-ui/index.html
-DB 마이그레이션/시드는 앱 시작 시 Flyway가 자동 실행합니다.
-(V1__init.sql → V2__seed.sql)
-
-B. 로컬(직접 실행, 개발용)
-준비물
-Java 21+
-
-MySQL 8 + Redis 7 (로컬 또는 Docker)
-
-환경변수 .env (또는 OS env로 주입)
-
+# 브라우저: http://localhost:8080/swagger-ui/index.html
+4) 종료
 bash
 코드 복사
-# (선택) DB/Redis만 docker로 띄우고 앱은 로컬에서 실행 가능
+docker compose down
+2-2. 로컬 실행 (Gradle 직접 실행)
+이 방식은 MySQL/Redis가 필요하므로, 보통은 DB/Redis만 docker로 올리고 앱은 로컬에서 띄우는 것을 추천
+
+1) MySQL/Redis만 실행
+bash
+코드 복사
 docker compose up -d mysql redis
+2) (선택) .env 로드
+IntelliJ Run Config에 env 주입하거나
 
-# 앱 실행
-./gradlew bootRun
+터미널에서 export로 환경변수 지정
+
+3) 앱 실행
+bash
+코드 복사
+./gradlew clean bootRun
+4) 확인
+bash
+코드 복사
+curl -i http://localhost:8080/actuator/health
 3) 환경변수 설명 (.env.example와 매칭)
-구분	변수	설명	예시/기본값
-App	SERVER_PORT	서버 포트	8080
-App	CORS_ALLOWED_ORIGINS	CORS 허용 Origin	http://localhost:3000
-RateLimit	RATE_LIMIT_ENABLED	레이트리밋 on/off	true
-RateLimit	RATE_LIMIT_PER_MINUTE	분당 허용 요청 수	120
-JWT	JWT_SECRET	JWT 서명키(32자 이상 권장)	CHANGE_ME...
-JWT	JWT_ISSUER	발급자(issuer)	blogtp
-JWT	JWT_ACCESS_MINUTES	Access 토큰 만료(분)	30
-JWT	JWT_REFRESH_DAYS	Refresh 토큰 만료(일)	14
-MySQL	DB_HOST	DB 호스트(도커 서비스명)	mysql
-MySQL	DB_PORT	DB 포트	3306
-MySQL	DB_NAME	DB 이름	blogtp
-MySQL	DB_USERNAME	DB 유저	blogtp
-MySQL	DB_PASSWORD	DB 비밀번호	blogtp
-MySQL	DB_URL	JDBC URL	jdbc:mysql://mysql:3306/blogtp?...
-Redis	REDIS_HOST	Redis 호스트(도커 서비스명)	redis
-Redis	REDIS_PORT	Redis 포트	6379
-Social	GOOGLE_CLIENT_ID	(옵션) Google Login	공란 가능
-Social	FIREBASE_ENABLED	Firebase on/off	false
-Social	FIREBASE_CREDENTIALS_BASE64	(옵션) 서비스계정 base64	공란 가능
+변수	설명	예시
+SERVER_PORT	서버 포트	8080
+CORS_ALLOWED_ORIGINS	CORS 허용 Origin	http://localhost:3000
+RATE_LIMIT_ENABLED	레이트리밋 사용 여부	true/false
+RATE_LIMIT_PER_MINUTE	분당 허용 요청 수	120
+JWT_SECRET	JWT 서명 키(32자 이상 권장)	CHANGE_ME...
+JWT_ISSUER	JWT issuer	blogtp
+JWT_ACCESS_MINUTES	Access 토큰 만료(분)	30
+JWT_REFRESH_DAYS	Refresh 토큰 만료(일)	14
+DB_HOST	DB 호스트(도커에서는 mysql)	mysql
+DB_PORT	DB 포트	3306
+DB_NAME	DB 이름	blogtp
+DB_USERNAME	DB 계정	blogtp
+DB_PASSWORD	DB 비번	blogtp
+DB_URL	JDBC URL	jdbc:mysql://mysql:3306/blogtp?...
+REDIS_HOST	Redis 호스트(도커에서는 redis)	redis
+REDIS_PORT	Redis 포트	6379
+GOOGLE_CLIENT_ID	(선택) 구글 로그인 검증용	(empty)
+FIREBASE_ENABLED	(선택) Firebase 로그인 사용	false
+FIREBASE_CREDENTIALS_BASE64	(선택) firebase key base64	(empty)
 
-4) 배포 주소 (예시: JCloud)
-아래는 “외부 포트포워딩이 적용된 최종 접근 URL” 기준으로 적으세요.
-(너 상황에 맞게 포트만 바꾸면 됨)
+⚠️ .env는 민감정보이므로 Git에 올리지 말고, .env.example만 커밋하세요.
 
-text
-코드 복사
-Base URL  : http://113.198.66.68:10062
-Swagger   : http://113.198.66.68:10062/swagger-ui/index.html
-Health    : http://113.198.66.68:10062/actuator/health
-OpenAPI   : http://113.198.66.68:10062/v3/api-docs
-5) 인증 플로우 설명 (JWT Access + Refresh)
-회원가입 POST /api/auth/signup
+4) 배포 주소
+Base URL: http://113.198.66.68:10062
 
-로그인 POST /api/auth/login
+Swagger URL: http://113.198.66.68:10062/swagger-ui/index.html
 
-응답으로 accessToken, refreshToken 반환
+Health URL: http://113.198.66.68:10062/actuator/health
 
-이후 요청 헤더에 Access 토큰 첨부
+5) 인증 플로우 설명 (JWT Access/Refresh)
+사용자가 POST /auth/login 요청 (email/password)
 
-Authorization: Bearer <accessToken>
+서버가 Access Token + Refresh Token 발급
 
-Access 만료 시 재발급
+클라이언트는 Access Token을 Authorization: Bearer <token> 형태로 API 요청에 포함
 
-POST /api/auth/refresh (+ refreshToken)
+Access Token 만료 시 POST /auth/refresh로 Refresh Token을 제출하여 Access Token 재발급
 
-Refresh 토큰은 DB에 저장되며, 재발급 시 로테이션(새 refresh 발급 + 기존 폐기) 합니다.
+로그아웃 시 POST /auth/logout로 Refresh Token을 무효화(저장소에서 제거/블랙리스트 처리)
 
-로그아웃
+6) 역할/권한표
+실제 엔드포인트는 Swagger를 기준으로 제출합니다.
 
-POST /api/auth/logout → 해당 refresh 토큰을 DB에서 폐기
+구분	권한	설명
+ROLE_USER	기본 사용자	게시글/댓글/좋아요/북마크 등 일반 기능
+ROLE_ADMIN	관리자	사용자/콘텐츠 관리성 기능(관리자 전용 API)
 
-6) 역할/권한표 (ROLE_USER / ROLE_ADMIN)
-기본 정책: /api/**는 인증 필요
-예외: /api/auth/**, /api/stats/**, Swagger, Health 는 공개
+접근 권한 예시
+API 그룹	USER	ADMIN
+Auth (login/refresh/logout)	✅	✅
+Posts 조회	✅	✅
+Posts 작성/수정/삭제	✅ (본인)	✅
+Comments	✅	✅
+Categories 관리	❌/✅(정책에 따라)	✅
+Stats	✅/❌(정책에 따라)	✅
 
-구분	ROLE_USER	ROLE_ADMIN	Public
-Swagger/Docs/Health	-	-	✅
-Auth (signup/login/refresh/logout)	✅(로그인 후 일부)	✅	✅(signup/login/refresh/logout 접근은 허용)
-Posts/Comments/Likes/Bookmarks/Categories	✅	✅	❌
-Admin User 관리 (/api/admin/**)	❌	✅	❌
-Stats (/api/stats/**)	-	-	✅
+7) 예제 계정
+일반 사용자: user1@example.com / P@ssw0rd!
 
-7) 예제 계정 (시드 데이터)
-Flyway 시드(V2__seed.sql)로 아래 계정이 자동 생성됩니다.
+관리자: admin@example.com / P@ssw0rd!
 
-text
-코드 복사
-USER  : user1@blogtp.local / P@ssw0rd!
-ADMIN : admin@blogtp.local / P@ssw0rd!
-ADMIN 계정은 관리자 API 호출 및 권한 변경 기능이 가능하므로 외부 공개 환경에서는 비밀번호 변경 권장.
+⚠️ 관리자 계정은 데이터 변경/삭제 가능 기능이 포함될 수 있으니 테스트 시 주의
 
 8) DB 연결 정보(테스트용)
-Docker Compose 기준 (로컬):
+Docker Compose 내부 네트워크 기준
+Host: mysql
 
-text
-코드 복사
-Host: localhost
 Port: 3306
-DB  : blogtp
+
+DB: blogtp
+
 User: blogtp
-Pass: blogtp
-권한 범위:
 
-blogtp 유저는 blogtp DB에 대한 일반 CRUD 권한을 가정합니다.
+Password: blogtp
 
-운영 환경에서는 root 계정 노출 금지 권장
+권한 범위: 테스트/개발용 (제출용)
 
-9) 엔드포인트 요약표
-Base Path: /api
+외부(로컬 PC)에서 DB 접속 시
+Host: localhost
 
-Auth
-Method	URL	설명	권한
-POST	/api/auth/signup	회원가입	Public
-POST	/api/auth/login	로그인(토큰 발급)	Public
-POST	/api/auth/refresh	토큰 재발급(로테이션)	Public
-POST	/api/auth/logout	로그아웃(Refresh 폐기)	USER/ADMIN
+Port: 3307 (compose 포트 매핑 기준)
 
-Users
-Method	URL	설명	권한
-GET	/api/users/me	내 프로필 조회	USER/ADMIN
+## 9) 엔드포인트 요약표
 
-Admin
-Method	URL	설명	권한
-GET	/api/admin/users	유저 목록 조회	ADMIN
-PATCH	`/api/admin/users/{id}/role?role=ADMIN	USER`	유저 권한 변경
-PATCH	/api/admin/users/{id}/deactivate	유저 비활성화	ADMIN
+> ✅ 아래 표는 Swagger 기준으로 정리한 “요약”입니다.  
+> 자세한 Request/Response 스키마와 예시는 Swagger 문서를 기준으로 합니다.
 
-Categories
-Method	URL	설명	권한
-POST	/api/categories	카테고리 생성	USER/ADMIN
-GET	/api/categories	카테고리 목록	USER/ADMIN
-PATCH	/api/categories/{id}	카테고리 수정	USER/ADMIN
-DELETE	/api/categories/{id}	카테고리 삭제	USER/ADMIN
+### Auth (인증 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| POST | /api/auth/signup | 회원가입 | ❌ |
+| POST | /api/auth/login | 로그인 | ❌ |
+| POST | /api/auth/refresh | 토큰 재발급 | ❌ |
+| POST | /api/auth/logout | 로그아웃 | ✅ (Refresh 필요) |
+| POST | /api/auth/login/google | 구글 소셜 로그인 | ❌ |
+| POST | /api/auth/login/firebase | Firebase 소셜 로그인 | ❌ |
 
-Posts
-Method	URL	설명	권한
-POST	/api/posts	게시글 작성	USER/ADMIN
-GET	/api/posts	게시글 목록(페이지네이션)	USER/ADMIN
-GET	/api/posts/{id}	게시글 단건 조회	USER/ADMIN
-PATCH	/api/posts/{id}	게시글 수정	USER/ADMIN
-DELETE	/api/posts/{id}	게시글 삭제	USER/ADMIN
+### Users (회원 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| GET | /api/users/me | 내 정보 조회 | ✅ |
+| PATCH | /api/users/me/password | 비밀번호 변경 | ✅ |
+| DELETE | /api/users/me | 회원 비활성화 | ✅ |
 
-Comments
-Method	URL	설명	권한
-POST	/api/posts/{postId}/comments	댓글 작성	USER/ADMIN
-GET	/api/posts/{postId}/comments	댓글 목록 조회	USER/ADMIN
-DELETE	/api/comments/{id}	댓글 삭제	USER/ADMIN
+### Admin (관리자 API)
+| Method | URL | 설명 | 권한 |
+|---|---|---|---|
+| GET | /api/admin/users | 회원 목록 조회 | ROLE_ADMIN |
+| PATCH | /api/admin/users/{userId}/role | 회원 권한 변경 | ROLE_ADMIN |
+| PATCH | /api/admin/users/{userId}/status | 회원 상태 변경 | ROLE_ADMIN |
 
-Likes
-Method	URL	설명	권한
-POST	/api/posts/{postId}/likes	좋아요 토글	USER/ADMIN
+### Posts (게시글 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| GET | /api/posts | 게시글 목록 조회 | ❌ |
+| GET | /api/posts/{id} | 게시글 상세 조회 | ❌ |
+| GET | /api/posts/me | 내 게시글 목록 | ✅ |
+| POST | /api/posts | 게시글 작성 | ✅ |
+| PUT | /api/posts/{id} | 게시글 수정 | ✅ (본인/관리자) |
+| DELETE | /api/posts/{id} | 게시글 삭제 | ✅ (본인/관리자) |
+| POST | /api/posts/{id}/publish | 게시글 발행 | ✅ (본인/관리자) |
+| POST | /api/posts/{id}/unpublish | 게시글 발행 취소 | ✅ (본인/관리자) |
 
-Bookmarks
-Method	URL	설명	권한
-POST	/api/posts/{postId}/bookmarks	북마크 추가	USER/ADMIN
-DELETE	/api/posts/{postId}/bookmarks	북마크 삭제	USER/ADMIN
-GET	/api/bookmarks/me	내 북마크 목록	USER/ADMIN
+### Comments (댓글 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| GET | /api/posts/{postId}/comments | 댓글 목록 조회 | ❌ |
+| POST | /api/posts/{postId}/comments | 댓글 작성 | ✅ |
+| PUT | /api/comments/{commentId} | 댓글 수정 | ✅ (본인/관리자) |
+| DELETE | /api/comments/{commentId} | 댓글 삭제 | ✅ (본인/관리자) |
 
-Stats (Public)
-Method	URL	설명	권한
-GET	/api/stats/summary	통계 요약	Public
-GET	/api/stats/daily-posts?days=7	일자별 게시글 수	Public
-GET	/api/stats/top-authors?limit=5	상위 작성자(옵션)	Public
+### Categories (카테고리 API)
+| Method | URL | 설명 | 권한 |
+|---|---|---|---|
+| GET | /api/categories | 카테고리 목록 조회 | ❌ |
+| POST | /api/categories | 카테고리 생성 | ROLE_ADMIN *(또는 정책에 따라 USER 제한 가능)* |
+| PUT | /api/categories/{id} | 카테고리 수정 | ROLE_ADMIN |
+| DELETE | /api/categories/{id} | 카테고리 삭제 | ROLE_ADMIN |
 
-10) 에러 응답 공통 포맷 (일관된 JSON)
+### Likes (좋아요 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| GET | /api/posts/{postId}/likes | 좋아요 수 조회 | ❌ |
+| POST | /api/posts/{postId}/likes | 좋아요 | ✅ |
+| DELETE | /api/posts/{postId}/likes | 좋아요 취소 | ✅ |
+
+### Bookmarks (북마크 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| GET | /api/bookmarks/me | 내 북마크 목록 | ✅ |
+| POST | /api/posts/{postId}/bookmarks | 북마크 추가 | ✅ |
+| DELETE | /api/posts/{postId}/bookmarks | 북마크 삭제 | ✅ |
+
+### Stats (통계 API)
+| Method | URL | 설명 | 권한 |
+|---|---|---|---|
+| GET | /api/stats/daily-posts | 일자별 게시글 수 | ❌ *(또는 ADMIN만)* |
+| GET | /api/stats/top-authors | 상위 작성자 | ❌ *(또는 ADMIN만)* |
+
+### Health (헬스체크 API)
+| Method | URL | 설명 | 인증 |
+|---|---|---|---|
+| GET | /health | 헬스 체크 | ❌ |
+
+---
+
+## 6) 역할/권한표 (ROLE 기반 접근 정책)
+
+> 기본 정책(권장):
+- **Public(비로그인)**: 조회성 API 위주 허용
+- **ROLE_USER**: 작성/수정/삭제 등 개인 기능 허용
+- **ROLE_ADMIN**: 사용자 관리 + 시스템 관리 기능 허용
+
+### 6-1. 권한별 접근 가능 API 요약
+
+| API 그룹 | Public | ROLE_USER | ROLE_ADMIN |
+|---|:---:|:---:|:---:|
+| Auth (signup/login/refresh) | ✅ | ✅ | ✅ |
+| Posts 조회 (/api/posts, /api/posts/{id}) | ✅ | ✅ | ✅ |
+| Posts 작성/내글목록 | ❌ | ✅ | ✅ |
+| Posts 수정/삭제/발행 | ❌ | ✅(본인) | ✅ |
+| Comments 목록 조회 | ✅ | ✅ | ✅ |
+| Comments 작성 | ❌ | ✅ | ✅ |
+| Comments 수정/삭제 | ❌ | ✅(본인) | ✅ |
+| Likes 수 조회 | ✅ | ✅ | ✅ |
+| Likes 추가/취소 | ❌ | ✅ | ✅ |
+| Bookmarks | ❌ | ✅ | ✅ |
+| Categories 목록 | ✅ | ✅ | ✅ |
+| Categories 생성/수정/삭제 | ❌ | ❌ | ✅ |
+| Stats | ✅(선택) | ✅(선택) | ✅ |
+| Admin (/api/admin/**) | ❌ | ❌ | ✅ |
+
+> ⚠️ Categories/Stats의 “Public 허용 여부”는 과제 요구사항/교수님 기준에 맞춰 조정 가능합니다.
+
+10) 에러 응답 공통 포맷
+모든 오류 상황에 대해 일관된 JSON 형식의 응답을 반환합니다.
+
 json
 코드 복사
 {
-  "timestamp": "2025-12-24T12:34:56Z",
+  "timestamp": "2025-03-05T12:34:56Z",
   "path": "/api/posts/1",
   "status": 400,
   "code": "VALIDATION_FAILED",
-  "message": "요청 값이 유효하지 않습니다.",
+  "message": "요청 값이 올바르지 않습니다.",
   "details": {
-    "title": "must not be blank"
+    "title": "게시글 제목은 1~100자 이내여야 합니다."
   }
 }
 필드명	설명
@@ -239,75 +279,56 @@ timestamp	에러 발생 시각 (ISO 8601)
 path	요청 경로
 status	HTTP 상태 코드
 code	시스템 내부 에러 코드 (대문자+언더스코어)
-message	사용자용 에러 메시지
-details	(선택) 필드별 오류/추가 정보
+message	사용자에게 전달할 짧은 메시지
+details	(선택) 필드별 오류/상세 사유
 
-11) 표준 에러 코드 정의 (12종 이상)
-HTTP	code	설명
+11) 표준 에러 코드 정의 (최소 12종 이상)
+HTTP 코드	에러 코드	설명
 400	BAD_REQUEST	요청 형식이 올바르지 않음
-400	VALIDATION_FAILED	유효성 검사 실패
-400	INVALID_QUERY_PARAM	쿼리 파라미터 오류
-401	UNAUTHORIZED	인증 토큰 없음/오류
+400	VALIDATION_FAILED	필드 유효성 검사 실패
+400	INVALID_QUERY_PARAM	쿼리 파라미터 값이 잘못됨
+401	UNAUTHORIZED	인증 토큰 없음 또는 잘못된 토큰
 401	TOKEN_EXPIRED	토큰 만료
-403	FORBIDDEN	권한 없음
-404	RESOURCE_NOT_FOUND	리소스 없음(공통)
-404	USER_NOT_FOUND	유저 없음
-404	POST_NOT_FOUND	게시글 없음
-404	COMMENT_NOT_FOUND	댓글 없음
-404	CATEGORY_NOT_FOUND	카테고리 없음
-409	DUPLICATE_RESOURCE	중복 데이터
-409	STATE_CONFLICT	상태 충돌
-422	UNPROCESSABLE_ENTITY	논리적 처리 불가
-429	TOO_MANY_REQUESTS	레이트리밋 초과
-500	INTERNAL_SERVER_ERROR	서버 오류
-500	DATABASE_ERROR	DB 오류
-500	UNKNOWN_ERROR	최종 fallback
+403	FORBIDDEN	권한 없음(Role 불일치 등)
+404	RESOURCE_NOT_FOUND	요청 리소스가 존재하지 않음
+404	USER_NOT_FOUND	사용자 없음
+409	DUPLICATE_RESOURCE	중복 데이터(이메일 중복 등)
+409	STATE_CONFLICT	상태 충돌(이미 처리됨 등)
+422	UNPROCESSABLE_ENTITY	형식은 맞지만 논리적으로 처리 불가
+429	TOO_MANY_REQUESTS	요청 한도 초과(rate limit)
+500	INTERNAL_SERVER_ERROR	서버 내부 오류
+500	DATABASE_ERROR	DB 연동 오류
+500	UNKNOWN_ERROR	알 수 없는 오류 (fallback)
 
-12) Postman 컬렉션(JSON) 실행
-제출 파일:
+12) 에러 처리 규칙
+모든 예외는 위 표의 코드 중 하나로 매핑합니다.
 
-BlogTP.postman_collection.json
+Swagger 문서에서 각 엔드포인트에 대표 응답 예시를 포함합니다. (400/401/403/404/422/500 등)
 
-BlogTP.postman_environment.json
+Postman 테스트에서 대표 에러케이스를 실제로 검증하는 요청을 포함합니다.
 
-사용 방법:
-
-Postman → Import → Collection/Environment 각각 Import
-
-Environment 선택 후, 변수 baseUrl 확인
-
-Runner로 컬렉션 실행
-
-Pre-request/Test 스크립트가 토큰 저장/주입 및 응답 검증을 수행합니다(최소 5개 이상)
-
-컬렉션은 (1) 랜덤 유저 회원가입 → (2) 로그인 → (3) 글 작성/댓글/좋아요/북마크 → (4) 내 프로필 조회 → (5) 통계 조회 흐름으로 구성되어 있습니다.
+Validation 실패 시 details에 필드별 오류를 포함합니다.
 
 13) 성능/보안 고려사항
-JWT + Refresh 토큰 로테이션
+JWT Secret 32자 이상 강제/권장
 
-Refresh 토큰은 DB에 저장/폐기 처리 → 탈취 시 피해 최소화
+Refresh 토큰 저장소(예: Redis) 기반으로 세션 무효화 가능
 
-BCrypt 해시
+입력값 검증(Validation) + 표준 에러 포맷
 
-비밀번호는 평문 저장하지 않고 BCrypt로 해시 저장
+페이지네이션 적용으로 대량 조회 성능 고려
 
-Rate Limiting (Redis)
+필요 시 인덱스 적용(예: posts.created_at, posts.author_id, category_id 등)
 
-IP 기반 분당 요청 제한 (환경변수로 조절)
-
-DB 인덱스
-
-게시글/댓글 조회 성능을 위한 인덱스 적용(작성자/생성일 등)
-
-CORS
-
-허용 Origin을 환경변수로 관리
+Rate Limit 옵션으로 과도한 요청 방지
 
 14) 한계와 개선 계획
-(개선) Posts/Comments의 검색 조건 확장(키워드, 카테고리 필터 등)
+통계/검색 기능 고도화(기간/조건 다양화, 캐싱 적용)
 
-(개선) Stats 결과 캐싱(Redis) 및 집계 성능 최적화
+관리자 기능 강화(유저/콘텐츠 관리 API 확장)
 
-(개선) 운영 환경에서 Secret/DB 계정 권한 최소화, HTTPS 적용
+테스트 커버리지 강화(MockMvc/통합테스트 확대)
 
-(개선) 소셜 로그인(Firebase/Google) 활성화 시 보안 검증 강화
+CI 적용(GitHub Actions로 빌드/테스트 자동화)
+
+운영 관점 로깅/모니터링(메트릭, APM) 추가
