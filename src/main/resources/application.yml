@@ -6,8 +6,8 @@ spring:
     name: blogtp
   datasource:
     url: ${DB_URL:jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:blogtp}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
-    username: ${DB_USERNAME:blogtp}
-    password: ${DB_PASSWORD:blogtp}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
   jpa:
     hibernate:
       # Flyway로 스키마를 생성/관리하므로, Hibernate는 검증만 수행
