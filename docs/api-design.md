@@ -1,4 +1,4 @@
-# 과제 설계(과제1) 대비 구현 요약
+# 과제 설계 구현 요약
 
 - 리소스: users / categories / posts / comments / likes / bookmarks (+ stats)
 - 공통 목록 규격: page, size, sort + keyword/categoryId/authorId 등의 필터 제공
