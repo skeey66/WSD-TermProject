@@ -322,5 +322,9 @@ API 서버는 모든 오류 상황에 대해 **일관된 JSON 형식의 응답**
 ## 12) 한계와 개선 계획
 - (개선) 게시글 검색/정렬/페이지네이션 고도화 및 인덱스 튜닝
 - (개선) 통계 API 캐싱 전략(Redis) 명확화 및 배치/스케줄링 도입
-- (개선) 소셜 로그인(Firebase/Google) 실제 운영 키 기반 검증 강화
+- (개선) 소셜 로그인(Firebase/Google) 실
+제 운영 키 기반 검증 강화
 - (개선) 관리자 기능(리포트/차단/감사 로그) 확장
+
+## 13)헬스 체크 스크린샷
+<img width="408" height="270" alt="11" src="https://github.com/user-attachments/assets/a7ab2f5d-3c7d-4be2-8706-38e7d987309d" />
