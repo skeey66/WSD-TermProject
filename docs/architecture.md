@@ -15,5 +15,5 @@
 ## 컨테이너 구성
 
 - `blogtp-app` : 8080
-- `blogtp-mysql` : 3306
+- `blogtp-mysql` : 3307
 - `blogtp-redis` : 6379
